@@ -5,6 +5,18 @@ Authors@R:
     person("Martin", "Lavallee", , "martin.lavallee@odysseusinc.com", role = c("aut", "cre"))
 Description: This package helps aid in the design and execution of ohdsi characterization studies.
 License: Apache License (>= 2)
+Depends:
+  R (>= 3.5.0),
+  DatabaseConnector (>= 4.0.0)
+Imports:
+    data.table,
+    magrittr,
+    usethis,
+    dplyr,
+    ggplot2,
+    rlang,
+    glue,
+    withr
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.0

@@ -7,8 +7,8 @@
 create_survival_table(
   treatment_history,
   connectionDetails,
-  generatedTargetCohort,
-  analysisSettings
+  resultsDatabaseSchema,
+  cohortTable
 )
 }
 \arguments{
@@ -16,9 +16,9 @@ create_survival_table(
 
 \item{connectionDetails}{a list of connectionDetails for DatabaseConnector}
 
-\item{generatedTargetCohort}{the target cohort generated for the analysis}
+\item{resultsDatabaseSchema}{the schema that hosts the users writeable results tables (or scratch)}
 
-\item{analysisSettings}{a DrugUtilizationAnalysisSettings object that defines the elements of the analysis}
+\item{cohortTable}{the name where the cohorts are stored in the results schema}
 }
 \value{
 a SurvivalAnalysis object containing the data for the survival

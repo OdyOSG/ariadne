@@ -162,8 +162,8 @@ rollupConditions <- function(connectionDetails,
   on.exit(DatabaseConnector::disconnect(connection))
 
   #change this to system file when turned into package
-  #conditionSql <- readr::read_file(system.file("sql/conditionRollup.sql", package = "ariadne"))
-  conditionSql <- readr::read_file("~/R/ideas/characterizationTables/sql/conditionRollup.sql")
+  conditionSql <- readr::read_file(system.file("sql/conditionRollup.sql", package = "ariadne"))
+  #conditionSql <- readr::read_file("~/R/ideas/characterizationTables/sql/conditionRollup.sql")
 
   conditionRollup <- DatabaseConnector::renderTranslateQuerySql(
     connection = connection,
@@ -187,8 +187,8 @@ rollupDrugs <- function(connectionDetails,
   on.exit(DatabaseConnector::disconnect(connection))
 
   #change this to system file when turned into package
-  drugSql <- readr::read_file("~/R/ideas/characterizationTables/sql/drugRollup.sql")
-  #drugSql <- readr::read_file(system.file("sql/drugRollup.sql", package = "ariadne"))
+  #drugSql <- readr::read_file("~/R/ideas/characterizationTables/sql/drugRollup.sql")
+  drugSql <- readr::read_file(system.file("sql/drugRollup.sql", package = "ariadne"))
 
   drugRollup <- DatabaseConnector::renderTranslateQuerySql(
     connection = connection,

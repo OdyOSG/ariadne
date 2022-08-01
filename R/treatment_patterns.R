@@ -5,7 +5,9 @@
 #' This function adopts ideas from TreatmentPatterns::addPathwayAnalysis and
 #' builds the settings needed for a drug utilization study.
 #' @param targetCohortId the Id of the target cohort
+#' @param targetCohortName the name of the target cohort
 #' @param eventCohortIds the ids of the event cohorts
+#' @param eventCohortNames the names of the event cohorts
 #' @param includeTreatments Include treatments starting ('startDate') or ending ('endDate') after target cohort start date
 #' @param periodPriorToIndex 	Number of days prior to the index date of the target cohort that event cohorts are allowed to start
 #' @param minEraDuration Minimum time an event era should last to be included in analysis
@@ -21,8 +23,10 @@
 #' @param strata a strata object of stratification settings
 #' @return a DrugUtilizationAnalysisSettings object defining the treatment analysis
 #' @export
-create_analysis_settings <- function(targetCohortId,
+define_treatment_history <- function(targetCohortId,
+                                     targetCohortName = NULL,
                                      eventCohortIds,
+                                     eventCohortNames = NULL,
                                      includeTreatments = "startDate",
                                      periodPriorToIndex = 0,
                                      minEraDuration = 0,
@@ -41,21 +45,24 @@ create_analysis_settings <- function(targetCohortId,
   # checkmate::assert_int(targetCohortId)
   # checkmate::assert_integer(eventCohortIds)
   #
-  # if (is.null(eventCohortNames)) {
-  #   eventCohortNames <- paste("Event_Cohort", eventCohortIds, sep = "_")
-  # }
-  #
-  # if (is.null(targetCohortName)) {
-  #   targetCohortName <- paste("Target Cohort", targetCohortId, sep = "_")
-  # }
+  if (is.null(eventCohortNames)) {
+    eventCohortNames <- paste("Event_Cohort", eventCohortIds, sep = "_")
+  }
+
+  if (is.null(targetCohortName)) {
+    targetCohortName <- paste("Target Cohort", targetCohortId, sep = "_")
+  }
   # checkmate::assert_set_equal(length(eventCohortIds), length(eventCohortNames))
   checkmate::assert_choice(includeTreatments, c("startDate", "endDate"))
   checkmate::assert_choice(filterTreatments, c("First", "Changes", "All"))
 
+
   #create settings
   settings <- structure(list(
     targetCohortId = targetCohortId,
+    targetCohortName = targetCohortName,
     eventCohortIds = eventCohortIds,
+    eventCohortNames = eventCohortNames,
     includeTreatments = includeTreatments,
     periodPriorToIndex = periodPriorToIndex,
     minEraDuration = minEraDuration,
@@ -68,11 +75,22 @@ create_analysis_settings <- function(targetCohortId,
     minCellMethod = minCellMethod,
     groupCombinations = groupCombinations,
     addNoPaths = addNoPaths,
-    strata = strata), class = "DrugUtilizationAnalysisSettings")
+    strata = strata), class = "ariadne_treatment_history_settings")
 
   return(settings)
 }
 
+#' Function to build survival table
+#' @param analysisSettings an ariadne_treatment_history_settings object
+#' @export
+build_treatment_history <- function(analysisSettings) {
+  #create treatment history call
+  args <- rlang::fn_fmls_syms(treatment_history)
+  args$analysisSettings <- analysisSettings
+  call <- rlang::call2("treatment_history",
+                       !!!args)
+  return(eval(call))
+}
 
 
 #' Function that creates the treatment history
@@ -82,37 +100,39 @@ create_analysis_settings <- function(targetCohortId,
 #' @param connectionDetails a list of connectionDetails for DatabaseConnector
 #' @param cdmDatabaseSchema the schema that hosts the cdm tables, defaults to value
 #' in config.yml of the active configuration
-#' @param analysisSettings a DrugUtilizationAnalysisSettings object that defines the elements of the analysis
-#' @param generatedCohorts the list of cohorts generated for the analysis
+#' @param resultsDatabaseSchema the schema that hosts the users writeable results tables (or scratch)
+#' @param cohortTable the name where the cohorts are stored in the results schema
+#' @param analysisSettings an object that defines the elements of the analysis
 #' @include utils.R strata.R
 #' @importFrom data.table :=
 #' @return a data.table with the treatment history
 #' @export
-create_treatment_history <- function(connectionDetails,
+treatment_history <- function(connectionDetails,
                                      cdmDatabaseSchema,
-                                     analysisSettings,
-                                     generatedCohorts) {
+                                     resultsDatabaseSchema,
+                                     cohortTable,
+                                     analysisSettings) {
 
-  checkmate::assert_class(analysisSettings, "DrugUtilizationAnalysisSettings")
-  checkmate::assert_list(generatedCohorts)
+  checkmate::assert_class(analysisSettings, "ariadne_treatment_history_settings")
+  # checkmate::assert_list(generatedCohorts)
 
   suppressMessages(connection <- DatabaseConnector::connect(connectionDetails))
   on.exit(DatabaseConnector::disconnect(connection))
 
-  cohortId <- purrr::map_dbl(generatedCohorts, ~.x$cohort_id) %>%
-    as.integer()
-  targetId <- cohortId[cohortId %in% analysisSettings$targetCohortId]
-  eventCohortIds <- cohortId[cohortId %in% analysisSettings$eventCohortIds]
+  # cohortId <- purrr::map_dbl(generatedCohorts, ~.x$cohort_id) %>%
+  #   as.integer()
+  targetId <- analysisSettings$targetCohortId
+  eventCohortIds <- analysisSettings$eventCohortIds
 
-  targetGeneratedCohort <- generatedCohorts[[targetId]]
-  eventGeneratedCohorts <- generatedCohorts[eventCohortIds]
+  # targetGeneratedCohort <- generatedCohorts[[targetId]]
+  # eventGeneratedCohorts <- generatedCohorts[eventCohortIds]
 
   #database schemas
-  resultsDatabaseSchema <- targetGeneratedCohort$cohortTableRef$cohortDatabaseSchema
-  cohortTable <- targetGeneratedCohort$cohortTableRef$cohortTableNames$cohortTable
+  # resultsDatabaseSchema <- targetGeneratedCohort$cohortTableRef$cohortDatabaseSchema
+  # cohortTable <- targetGeneratedCohort$cohortTableRef$cohortTableNames$cohortTable
   #set parameters
   targetCohortId <- targetId
-  eventCohortNames <- purrr::map_chr(eventGeneratedCohorts, ~.x$cohort_name)
+  eventCohortNames <- analysisSettings$eventCohortNames
   includeTreatments <- analysisSettings$includeTreatments
   periodPriorToIndex <- analysisSettings$periodPriorToIndex
   minEraDuration <- analysisSettings$minEraDuration
@@ -140,7 +160,7 @@ create_treatment_history <- function(connectionDetails,
   colnames(current_cohorts) <- c("cohort_id", "person_id", "start_date", "end_date")
 
   #create treatment history using TreatmentPatterns package
-  treatment_history <- doCreateTreatmentHistory(current_cohorts,
+  th <- doCreateTreatmentHistory(current_cohorts,
                                                 targetCohortId,
                                                 eventCohortIds,
                                                 periodPriorToIndex,
@@ -151,65 +171,83 @@ create_treatment_history <- function(connectionDetails,
     doFilterTreatments(filterTreatments)
 
   # Add event_seq number to determine order of treatments in pathway
-  treatment_history <- treatment_history[order(person_id, event_start_date, event_end_date),]
-  treatment_history[, event_seq:=seq_len(.N), by= .(person_id)]
+  th <- th[order(person_id, event_start_date, event_end_date),]
+  th[, event_seq:=seq_len(.N), by= .(person_id)]
 
-  treatment_history <- doMaxPathLength(treatment_history, maxPathLength) %>%
+  th <- doMaxPathLength(th, maxPathLength) %>%
     # Add event_cohort_name (instead of only event_cohort_id)
     addLabels(eventCohortIds, eventCohortNames)
 
   #some clean up for the combination names
-  combi <- grep("+", treatment_history$event_cohort_name, fixed=TRUE)
-  cohort_names <- strsplit(treatment_history$event_cohort_name[combi], split="+", fixed=TRUE)
-  treatment_history$event_cohort_name[combi] <- sapply(cohort_names, function(x) paste(sort(x), collapse = "+"))
-  treatment_history$event_cohort_name <- unlist(treatment_history$event_cohort_name)
+  combi <- grep("+", th$event_cohort_name, fixed=TRUE)
+  cohort_names <- strsplit(th$event_cohort_name[combi], split="+", fixed=TRUE)
+  th$event_cohort_name[combi] <- sapply(cohort_names, function(x) paste(sort(x), collapse = "+"))
+  th$event_cohort_name <- unlist(th$event_cohort_name)
 
-  #create stratas
-  strata <- eval(analysisSettings$strata$call) %>%
-    tibble::as_tibble() %>%
-    dplyr::rename(strata = value)
+  #add strata
+  th <- th %>%
+    dplyr::left_join(analysisSettings$strata,
+                     by = c("person_id" = "subjectId"))
 
-  treatment_history <- dplyr::bind_cols(treatment_history, strata)
+  obj <- structure(
+    list(
+      treatment_history = th,
+      analysis_settings = analysisSettings
+    ),
+    class = "ariadne_treatment_history"
+  )
 
-  return(treatment_history)
+
+  return(obj)
+}
+
+#' Function to build treatment patterns
+#' @param treatment_history an ariadne_treatment_history object
+#' @export
+build_treatment_patterns <- function(treatment_history) {
+  #create treatment history call
+  args <- rlang::fn_fmls_syms(treatment_patterns)
+  args$treatment_history <- treatment_history
+  call <- rlang::call2("treatment_patterns",
+                       !!!args)
+  return(eval(call))
 }
 
 #' Function to construct the treatment patterns
 #'
-#' @param treatment_history the dataframe output from create_treatment_history
-#' @param analysisSettings a DrugUtilizationAnalysisSettings object that defines the elements of the analysis
+#' @param treatment_history the dataframe output from treatment_history
 #' @return a PathwayAnalysis object with the treatment patterns and attrition
 #' @include utils.R
 #' @export
-create_treatment_patterns <- function(treatment_history,
-                                      analysisSettings) {
+treatment_patterns <- function(treatment_history) {
 
-  checkmate::assert_class(analysisSettings, "DrugUtilizationAnalysisSettings")
-  checkmate::assert_data_table(treatment_history)
+  checkmate::assert_class(treatment_history, "ariadne_treatment_history")
 
-  minCellCount <- analysisSettings$minCellCount
+  minCellCount <- treatment_history$analysis_settings$minCellCount
 
-  treatment_pathways <- treatment_history %>%
+
+
+  tp <- treatment_history$treatment_history %>%
     tidyr::pivot_wider(id_cols = person_id,
                        names_from = event_seq,
                        names_prefix = "event_cohort_name",
                        values_from = event_cohort_name)
   #get number of individuals
-  numPersons <- nrow(treatment_pathways)
+  numPersons <- nrow(tp)
 
   #
-  treatment_pathways <- treatment_pathways %>%
+  tp <- tp %>%
     dplyr::count(dplyr::across(tidyselect::starts_with("event_cohort_name"))) %>%
     dplyr::mutate(End = "end", .before = "n")
 
 
-  numPathways <- nrow(treatment_pathways)
+  numPathways <- nrow(tp)
 
-  treatment_pathways <- treatment_pathways %>%
+  tp <- tp %>%
     dplyr::filter(n >= minCellCount)
 
-  numPersons2 <- sum(treatment_pathways$n)
-  numPathways2 <- nrow(treatment_pathways)
+  numPersons2 <- sum(tp$n)
+  numPathways2 <- nrow(tp)
 
 
   df <- data.frame(
@@ -223,102 +261,107 @@ create_treatment_patterns <- function(treatment_history,
 
   pathway_analysis <- structure(
     list(
-      treatmentPathways = treatment_pathways,
-      attrition = df
+      treatmentPathways = tp,
+      attrition = df,
+      analysis_settings = treatment_history$analysis_settings
     ),
-    class = "PathwayAnalysis")
+    class = "ariadne_treatment_pathway")
 
   return(pathway_analysis)
 
+}
+
+#' Function to build survival table
+#' @param treatment_history an ariadne_treatment_history object
+#' @export
+build_survival_table <- function(treatment_history) {
+  #create treatment history call
+  args <- rlang::fn_fmls_syms(create_survival_table)
+  args$treatment_history <- treatment_history
+  call <- rlang::call2("create_survival_table",
+                       !!!args)
+  return(eval(call))
 }
 
 #' Function that creates survival tables from the treatment history
 #'
 #' @param treatment_history the dataframe output from create_treatment_history
 #' @param connectionDetails a list of connectionDetails for DatabaseConnector
-#' @param generatedTargetCohort the target cohort generated for the analysis
-#' @param analysisSettings a DrugUtilizationAnalysisSettings object that defines the elements of the analysis
-#' @include utils.R
+#' @param resultsDatabaseSchema the schema that hosts the users writeable results tables (or scratch)
+#' @param cohortTable the name where the cohorts are stored in the results schema
+#' @include utils.R helpers.R
 #' @return a SurvivalAnalysis object containing the data for the survival
 #' analysis, the survfit object and the surv_summary object from survminer
 #' @export
 create_survival_table <- function(treatment_history,
                                   connectionDetails,
-                                  generatedTargetCohort,
-                                  analysisSettings) {
+                                  resultsDatabaseSchema,
+                                  cohortTable) {
 
   #set connection
   suppressMessages(connection <- DatabaseConnector::connect(connectionDetails))
   on.exit(DatabaseConnector::disconnect(connection))
 
-  resultsDatabaseSchema <- generatedTargetCohort$cohortTableRef$cohortDatabaseSchema
-  cohortTable <- generatedTargetCohort$cohortTableRef$cohortTableNames$cohortTable
+  # resultsDatabaseSchema <- generatedTargetCohort$cohortTableRef$cohortDatabaseSchema
+  # cohortTable <- generatedTargetCohort$cohortTableRef$cohortTableNames$cohortTable
 
-  targetCohortId <- analysisSettings$targetCohortId
-  minCellCount <- analysisSettings$minCellCount
+  targetCohortId <- treatment_history$analysis_settings$targetCohortId
+  minCellCount <- treatment_history$analysis_settings$minCellCount
+  strata <- treatment_history$analysis_settings$strata
 
   #extract target cohort for censoring
-  sql <- "SELECT * FROM @cohortDatabaseSchema.@cohortTable WHERE COHORT_DEFINITION_ID = @targetCohortId"
+  targetCohort <- getTargetCohort(connectionDetails = connectionDetails,
+                                  resultsDatabaseSchema = resultsDatabaseSchema,
+                                  cohortTable = cohortTable,
+                                  targetCohortId = targetCohortId)
 
-  targetCohort <- DatabaseConnector::renderTranslateQuerySql(connection = connection,
-                                                             sql = sql,
-                                                             cohortDatabaseSchema = resultsDatabaseSchema,
-                                                             cohortTable = cohortTable,
-                                                             targetCohortId = targetCohortId,
-                                                             snakeCaseToCamelCase = TRUE)
-  #create survival table
-  survTab <- treatment_history %>%
-    dplyr::left_join(targetCohort, by = c("person_id" = "subjectId")) %>%
-    dplyr::mutate(event = ifelse(event_end_date < cohortEndDate, 1, 0))
 
-  if(is.null(analysisSettings$strata)) {
-    survTab <- survTab %>%
-      dplyr::select(event_cohort_id, duration_era, event) %>%
-      tidyr::nest(data = !event_cohort_id) %>%
-      dplyr::mutate(nn = purrr::map_int(data, ~nrow(.x))) %>%
-      dplyr::filter(nn >= minCellCount) %>%
-      dplyr::select(event_cohort_id, data) %>%
-      dplyr::mutate(survFit = purrr::map(
-        data, ~survival::survfit(
-          survival::Surv(
-            duration_era, event
-          ) ~ 1,
-          data = .x))) %>%
-      dplyr::mutate(survInfo = purrr::map2(
-        survFit,
-        data,
-        ~survminer::surv_summary(.x, data = .y))) %>%
-      dplyr::mutate(survSum = purrr::map(survInfo, ~attr(.x, "table")))
-  } else {
-    survTab <- survTab %>%
-      dplyr::select(event_cohort_id, duration_era, event, tidyselect::starts_with("strata")) %>%
-      tidyr::nest(data = !event_cohort_id) %>%
-      dplyr::mutate(nn = purrr::map_int(data, ~nrow(.x))) %>%
-      dplyr::filter(nn >= minCellCount) %>%
-      dplyr::select(event_cohort_id, data) %>%
-      dplyr::mutate(survFit = purrr::map(
-        data, ~survival::survfit(
-          survival::Surv(
-            duration_era, event
-          ) ~ strata,
-          data = .x))) %>%
-      dplyr::mutate(survInfo = purrr::map2(
-        survFit,
-        data,
-        ~survminer::surv_summary(.x, data = .y))) %>%
-      dplyr::mutate(survSum = purrr::map(survInfo, ~attr(.x, "table")))
 
+  if (is.null(strata)) {
+    targetCohort <- targetCohort %>%
+      dplyr::mutate(strata_total = 1L)
+
+    strata_sym <- rlang::sym("strata_total")
   }
+
+  strata_sym <- treatment_history$treatment_history %>%
+    dplyr::select(tidyr::starts_with("strata")) %>%
+    names() %>%
+    rlang::sym ()
+
+
+  #create survival table
+  survTab <- treatment_history$treatment_history %>%
+    dplyr::left_join(targetCohort, by = c("person_id" = "subjectId")) %>%
+    dplyr::mutate(event = ifelse(event_end_date < cohortEndDate, 1, 0)) %>%
+    dplyr::select(event_cohort_id, duration_era, event, !!strata_sym) %>%
+    tidyr::nest(data = !event_cohort_id) %>%
+    dplyr::mutate(nn = purrr::map_int(data, ~nrow(.x))) %>%
+    dplyr::filter(nn >= minCellCount) %>%
+    dplyr::select(event_cohort_id, data) %>%
+    dplyr::mutate(survFit = purrr::map(
+      data, ~survival::survfit(
+        survival::Surv(
+          duration_era, event
+        ) ~ !!strata_sym,
+        data = .x))) %>%
+    dplyr::mutate(survInfo = purrr::map2(
+      survFit,
+      data,
+      ~survminer::surv_summary(.x, data = .y))) %>%
+    dplyr::mutate(survSum = purrr::map(survInfo, ~attr(.x, "table")))
+
 
 
   survival_table <- structure(
     list(data = survTab$data,
          survFit = survTab$survFit,
          survInfo = survTab$survInfo,
-         survSum = survTab$survSum),
-    class = "SurvivalAnalysis")
+         survSum = survTab$survSum,
+         analysis_settings = treatment_history$analysis_settings),
+    class = "ariadne_survival_analysis")
 
-  survival_table <- purrr::map(survival_table, ~purrr::set_names(.x, survTab$event_cohort_id))
+  survival_table[1:4] <- purrr::map(survival_table[1:4], ~purrr::set_names(.x, survTab$event_cohort_id))
 
   return(survival_table)
 
