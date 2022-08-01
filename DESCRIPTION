@@ -1,0 +1,18 @@
+Package: ariadne
+Title: OHDSI Characterization Study Aid
+Version: 0.0.0.9000
+Authors@R: 
+    person("Martin", "Lavallee", , "martin.lavallee@odysseusinc.com", role = c("aut", "cre"))
+Description: This package helps aid in the design and execution of ohdsi characterization studies.
+License: Apache License (>= 2)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.0
+Collate: 
+    'utils.R'
+    'helpers.R'
+    'covariate_analysis.R'
+    'plots.R'
+    'save.R'
+    'strata.R'
+    'treatment_patterns.R'
