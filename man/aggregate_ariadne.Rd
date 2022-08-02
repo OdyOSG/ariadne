@@ -9,7 +9,7 @@ aggregate_ariadne(
   strata = NULL,
   connectionDetails,
   cdmDatabaseSchema,
-  output_folder
+  outputFolder
 )
 }
 \arguments{
@@ -19,7 +19,7 @@ aggregate_ariadne(
 
 \item{cdmDatabaseSchema}{the schema of the cdm}
 
-\item{output_folder}{a folder where the aggregated covariates are stored}
+\item{outputFolder}{a folder where the aggregated covariates are stored}
 
 \item{strata_df}{a dataframe with the strata. This parameter can be null if so
 it will find the unique subjects from the cohort and make a total strata}

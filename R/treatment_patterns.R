@@ -121,7 +121,7 @@ treatment_history <- function(connectionDetails,
 
   # cohortId <- purrr::map_dbl(generatedCohorts, ~.x$cohort_id) %>%
   #   as.integer()
-  targetId <- analysisSettings$targetCohortId
+  targetCohortId <- analysisSettings$targetCohortId
   eventCohortIds <- analysisSettings$eventCohortIds
 
   # targetGeneratedCohort <- generatedCohorts[[targetId]]
@@ -131,16 +131,6 @@ treatment_history <- function(connectionDetails,
   # resultsDatabaseSchema <- targetGeneratedCohort$cohortTableRef$cohortDatabaseSchema
   # cohortTable <- targetGeneratedCohort$cohortTableRef$cohortTableNames$cohortTable
   #set parameters
-  targetCohortId <- targetId
-  eventCohortNames <- analysisSettings$eventCohortNames
-  includeTreatments <- analysisSettings$includeTreatments
-  periodPriorToIndex <- analysisSettings$periodPriorToIndex
-  minEraDuration <- analysisSettings$minEraDuration
-  eraCollapseSize <- analysisSettings$eraCollapseSize
-  combinationWindow <- analysisSettings$combinationWindow
-  minPostCombinationDuration <- analysisSettings$minPostCombinationDuration
-  filterTreatments <- analysisSettings$filterTreatments
-  maxPathLength <- analysisSettings$maxPathLength
 
   #extract cohorts
   sql <-"WITH CTE_person AS(
@@ -160,23 +150,32 @@ treatment_history <- function(connectionDetails,
   colnames(current_cohorts) <- c("cohort_id", "person_id", "start_date", "end_date")
 
   #create treatment history using TreatmentPatterns package
-  th <- doCreateTreatmentHistory(current_cohorts,
-                                                targetCohortId,
-                                                eventCohortIds,
-                                                periodPriorToIndex,
-                                                includeTreatments) %>%
-    doEraDuration(minEraDuration) %>%
-    doEraCollapse(eraCollapseSize) %>%
-    doCombinationWindow(combinationWindow, minPostCombinationDuration) %>%
-    doFilterTreatments(filterTreatments)
+
+  th <- quiet_th(current_cohorts = current_cohorts,
+                 targetCohortId = targetCohortId,
+                 eventCohortIds = eventCohortIds,
+                 periodPriorToIndex = analysisSettings$periodPriorToIndex,
+                 includeTreatments = analysisSettings$includeTreatments,
+                 minEraDuration = analysisSettings$minEraDuration,
+                 eraCollapseSize = analysisSettings$eraCollapseSize,
+                 combinationWindow = analysisSettings$combinationWindow,
+                 minPostCombinationDuration = analysisSettings$minPostCombinationDuration,
+                 filterTreatments = analysisSettings$filterTreatments)
+
+  log <- str_split(th$output, "\n")[[1]]
+  th <- th$result
 
   # Add event_seq number to determine order of treatments in pathway
   th <- th[order(person_id, event_start_date, event_end_date),]
   th[, event_seq:=seq_len(.N), by= .(person_id)]
 
-  th <- doMaxPathLength(th, maxPathLength) %>%
+  quiet_doMaxPathLength <- purrr::quietly(doMaxPathLength)
+
+  th <- quiet_doMaxPathLength(th, analysisSettings$maxPathLength)
+  log <- c(log, str_split(th$output, "\n")[[1]])
+  th <- th$result %>%
+    addLabels(eventCohortIds, analysisSettings$eventCohortNames)
     # Add event_cohort_name (instead of only event_cohort_id)
-    addLabels(eventCohortIds, eventCohortNames)
 
   #some clean up for the combination names
   combi <- grep("+", th$event_cohort_name, fixed=TRUE)
@@ -185,20 +184,24 @@ treatment_history <- function(connectionDetails,
   th$event_cohort_name <- unlist(th$event_cohort_name)
 
   #add strata
+  if (!is.null(analysisSettings$strata)) {
   th <- th %>%
     dplyr::left_join(analysisSettings$strata,
                      by = c("person_id" = "subjectId"))
-
-  obj <- structure(
-    list(
-      treatment_history = th,
-      analysis_settings = analysisSettings
-    ),
-    class = "ariadne_treatment_history"
-  )
+  }
 
 
-  return(obj)
+  th_Meta <- structure(list(
+    th_directory = tempfile(),
+    th_log = log,
+    analysis_settings = analysisSettings
+  ), class = "ariadne_treatment_history")
+
+  arrow::write_feather(th, th_Meta$th_directory)
+
+
+
+  return(th_Meta)
 }
 
 #' Function to build treatment patterns
@@ -225,9 +228,9 @@ treatment_patterns <- function(treatment_history) {
 
   minCellCount <- treatment_history$analysis_settings$minCellCount
 
+  th <- arrow::read_feather(treatment_history$th_directory)
 
-
-  tp <- treatment_history$treatment_history %>%
+  tp <- th %>%
     tidyr::pivot_wider(id_cols = person_id,
                        names_from = event_seq,
                        names_prefix = "event_cohort_name",
@@ -263,6 +266,7 @@ treatment_patterns <- function(treatment_history) {
     list(
       treatmentPathways = tp,
       attrition = df,
+      th_log = treatment_history$th_log,
       analysis_settings = treatment_history$analysis_settings
     ),
     class = "ariadne_treatment_pathway")
@@ -327,11 +331,12 @@ create_survival_table <- function(treatment_history,
   strata_sym <- treatment_history$treatment_history %>%
     dplyr::select(tidyr::starts_with("strata")) %>%
     names() %>%
-    rlang::sym ()
+    rlang::sym()
 
+  th <- arrow::read_feather(treatment_history$th_directory)
 
   #create survival table
-  survTab <- treatment_history$treatment_history %>%
+  survTab <- th %>%
     dplyr::left_join(targetCohort, by = c("person_id" = "subjectId")) %>%
     dplyr::mutate(event = ifelse(event_end_date < cohortEndDate, 1, 0)) %>%
     dplyr::select(event_cohort_id, duration_era, event, !!strata_sym) %>%
@@ -358,6 +363,7 @@ create_survival_table <- function(treatment_history,
          survFit = survTab$survFit,
          survInfo = survTab$survInfo,
          survSum = survTab$survSum,
+         th_log = treatment_history$th_log,
          analysis_settings = treatment_history$analysis_settings),
     class = "ariadne_survival_analysis")
 
@@ -369,6 +375,31 @@ create_survival_table <- function(treatment_history,
 
 
 # Treatment history helper functions -----------------
+
+th <- function(current_cohorts,
+                     targetCohortId,
+                     eventCohortIds,
+                     periodPriorToIndex,
+                     includeTreatments,
+                     minEraDuration,
+                     eraCollapseSize,
+                     combinationWindow,
+                     minPostCombinationDuration,
+                     filterTreatments) {
+  doCreateTreatmentHistory(current_cohorts,
+                           targetCohortId,
+                           eventCohortIds,
+                           periodPriorToIndex,
+                           includeTreatments) %>%
+    doEraDuration(minEraDuration) %>%
+    doEraCollapse(eraCollapseSize) %>%
+    doCombinationWindow(combinationWindow, minPostCombinationDuration) %>%
+    doFilterTreatments(filterTreatments)
+}
+
+quiet_th <- purrr::quietly(th)
+
+
 
 
 #Functions from TreatmentPatterns ConstructPathways.R
@@ -412,7 +443,7 @@ doCreateTreatmentHistory <- function(current_cohorts, targetCohortId, eventCohor
 
 doEraDuration <- function(treatment_history, minEraDuration) {
   treatment_history <- treatment_history[duration_era >= minEraDuration,]
-  ParallelLogger::logInfo(print(paste0("After minEraDuration: ", nrow(treatment_history))))
+  ParallelLogger::logInfo(paste0("After minEraDuration: ", nrow(treatment_history)))
 
   return(treatment_history)
 }
@@ -440,7 +471,7 @@ doCombinationWindow <- function(treatment_history, combinationWindow, minPostCom
     # For rows selected not in column switch -> if treatment_history[r - 1, event_end_date] > treatment_history[r, event_end_date] -> add column combination last received, first stopped
     treatment_history[SELECTED_ROWS == 1 & is.na(switch) & shift(event_end_date, type = "lag") > event_end_date, combination_LRFS:=1]
 
-    ParallelLogger::logInfo(print(paste0("Iteration ", iterations, " modifying  ", sum(treatment_history$SELECTED_ROWS), " selected rows out of ", nrow(treatment_history), ": ", sum(!is.na(treatment_history$switch)) , " switches, ", sum(!is.na(treatment_history$combination_FRFS)), " combinations FRFS and ", sum(!is.na(treatment_history$combination_LRFS)), " combinations LRFS")))
+    ParallelLogger::logInfo(paste0("Iteration ", iterations, " modifying  ", sum(treatment_history$SELECTED_ROWS), " selected rows out of ", nrow(treatment_history), ": ", sum(!is.na(treatment_history$switch)) , " switches, ", sum(!is.na(treatment_history$combination_FRFS)), " combinations FRFS and ", sum(!is.na(treatment_history$combination_LRFS)), " combinations LRFS"))
     if (sum(!is.na(treatment_history$switch)) + sum(!is.na(treatment_history$combination_FRFS)) +  sum(!is.na(treatment_history$combination_LRFS)) != sum(treatment_history$SELECTED_ROWS)) {
       warning(paste0(sum(treatment_history$SELECTED_ROWS), ' does not equal total sum ', sum(!is.na(treatment_history$switch)) +  sum(!is.na(treatment_history$combination_FRFS)) +  sum(!is.na(treatment_history$combination_LRFS))))
     }
@@ -497,7 +528,7 @@ doCombinationWindow <- function(treatment_history, combinationWindow, minPostCom
     gc()
   }
 
-  ParallelLogger::logInfo(print(paste0("After combinationWindow: ", nrow(treatment_history))))
+  ParallelLogger::logInfo(paste0("After combinationWindow: ", nrow(treatment_history)))
 
   treatment_history[,GAP_PREVIOUS:=NULL]
   treatment_history[,SELECTED_ROWS:=NULL]
@@ -531,7 +562,7 @@ selectRowsCombinationWindow <- function(treatment_history) {
 }
 doStepDuration <- function(treatment_history, minPostCombinationDuration) {
   treatment_history <- treatment_history[(is.na(check_duration) | duration_era >= minPostCombinationDuration),]
-  ParallelLogger::logInfo(print(paste0("After minPostCombinationDuration: ", nrow(treatment_history))))
+  ParallelLogger::logInfo(paste0("After minPostCombinationDuration: ", nrow(treatment_history)))
 
   return(treatment_history)
 }
@@ -555,7 +586,7 @@ doEraCollapse <- function(treatment_history, eraCollapseSize) {
   # Re-calculate duration_era
   treatment_history[,duration_era:=difftime(event_end_date , event_start_date, units = "days")]
 
-  ParallelLogger::logInfo(print(paste0("After eraCollapseSize: ", nrow(treatment_history))))
+  ParallelLogger::logInfo(paste0("After eraCollapseSize: ", nrow(treatment_history)))
   return(treatment_history)
 }
 
@@ -591,7 +622,7 @@ doFilterTreatments <- function(treatment_history, filterTreatments) {
     }
   }
 
-  ParallelLogger::logInfo(print(paste0("After filterTreatments: ", nrow(treatment_history))))
+  ParallelLogger::logInfo(paste0("After filterTreatments: ", nrow(treatment_history)))
 
   return(treatment_history)
 }
@@ -601,7 +632,7 @@ doMaxPathLength <- function(treatment_history, maxPathLength) {
   # Apply maxPathLength
   treatment_history <- treatment_history[event_seq <= maxPathLength,]
 
-  ParallelLogger::logInfo(print(paste0("After maxPathLength: ", nrow(treatment_history))))
+  ParallelLogger::logInfo(paste0("After maxPathLength: ", nrow(treatment_history)))
 
   return(treatment_history)
 }

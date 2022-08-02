@@ -243,7 +243,7 @@ get_concept_strata <- function(connectionDetails,
     getUniquePersons() %>%
     getCdmElement(connectionDetails = connectionDetails,
                   cdmDatabaseSchema = cdmDatabaseSchema,
-                  vocabularyDatabaseSchema,
+                  vocabularyDatabaseSchema = vocabularyDatabaseSchema,
                   cdmTable = domain,
                   cdmTableElement = element,
                   cdmTableValue = concept,
@@ -286,14 +286,19 @@ build_strata <- function(strata,
 #' This function creates all combinations for the strata
 #'
 #' @param ... multiple strata objects
+#' @param type either combine or expand. Expand option looks at iteractions
 #' @return a tibble with all combinations of the strata for the unique persons in the cohort
 #' @export
-expand_strata <- function(...) {
+bind_strata <- function(..., type = c("combine","expand")) {
 
   strata_list <- list(...)
   dd <- do.call('cbind', strata_list)
   dd <- dd[ ,!duplicated(names(dd))]
 
+
+  type <- switch(type,
+                 combine = "+",
+                 expand = "*")
 
   subjectId <- dd$subjectId
 
@@ -301,7 +306,7 @@ expand_strata <- function(...) {
                           dd %>%
                             dplyr::select(tidyr::starts_with("strata")) %>%
                             names() %>%
-                            paste0(collapse = "*")))
+                            paste0(collapse = type)))
 
   gg <- dd %>%
     modelr::model_matrix(ff) %>%

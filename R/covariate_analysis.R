@@ -104,7 +104,7 @@ build_covariates <- function(covariates,
 #' it will find the unique subjects from the cohort and make a total strata
 #' @param connectionDetails a set of connectionDetails
 #' @param cdmDatabaseSchema the schema of the cdm
-#' @param output_folder a folder where the aggregated covariates are stored
+#' @param outputFolder a folder where the aggregated covariates are stored
 #' @return an aggregated_ariadne_covariates class object
 #' @include helpers.R utils.R
 #' @importFrom rlang !! !!!
@@ -113,7 +113,7 @@ aggregate_ariadne <- function(ariadne,
                                    strata = NULL,
                                    connectionDetails,
                                    cdmDatabaseSchema,
-                                   output_folder) {
+                                   outputFolder) {
 
   #Step 1: Setup strata ---------------------------
 
