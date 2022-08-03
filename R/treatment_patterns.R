@@ -74,8 +74,7 @@ define_treatment_history <- function(targetCohortId,
     minCellCount = minCellCount,
     minCellMethod = minCellMethod,
     groupCombinations = groupCombinations,
-    addNoPaths = addNoPaths,
-    strata = strata), class = "ariadne_treatment_history_settings")
+    addNoPaths = addNoPaths), class = "ariadne_treatment_history_settings")
 
   return(settings)
 }
@@ -182,13 +181,14 @@ treatment_history <- function(connectionDetails,
   cohort_names <- strsplit(th$event_cohort_name[combi], split="+", fixed=TRUE)
   th$event_cohort_name[combi] <- sapply(cohort_names, function(x) paste(sort(x), collapse = "+"))
   th$event_cohort_name <- unlist(th$event_cohort_name)
+  th$duration_era <- as.integer(th$duration_era)
 
   #add strata
-  if (!is.null(analysisSettings$strata)) {
-  th <- th %>%
-    dplyr::left_join(analysisSettings$strata,
-                     by = c("person_id" = "subjectId"))
-  }
+  # if (!is.null(analysisSettings$strata)) {
+  # th <- th %>%
+  #   dplyr::left_join(analysisSettings$strata,
+  #                    by = c("person_id" = "subjectId"))
+  # }
 
 
   th_Meta <- structure(list(
@@ -278,10 +278,11 @@ treatment_patterns <- function(treatment_history) {
 #' Function to build survival table
 #' @param treatment_history an ariadne_treatment_history object
 #' @export
-build_survival_table <- function(treatment_history) {
+build_survival_table <- function(treatment_history, strata) {
   #create treatment history call
   args <- rlang::fn_fmls_syms(create_survival_table)
   args$treatment_history <- treatment_history
+  args$strata <- strata
   call <- rlang::call2("create_survival_table",
                        !!!args)
   return(eval(call))
@@ -293,6 +294,7 @@ build_survival_table <- function(treatment_history) {
 #' @param connectionDetails a list of connectionDetails for DatabaseConnector
 #' @param resultsDatabaseSchema the schema that hosts the users writeable results tables (or scratch)
 #' @param cohortTable the name where the cohorts are stored in the results schema
+#' @param strata a strata object to stratify the survival analysis
 #' @include utils.R helpers.R
 #' @return a SurvivalAnalysis object containing the data for the survival
 #' analysis, the survfit object and the surv_summary object from survminer
@@ -300,7 +302,8 @@ build_survival_table <- function(treatment_history) {
 create_survival_table <- function(treatment_history,
                                   connectionDetails,
                                   resultsDatabaseSchema,
-                                  cohortTable) {
+                                  cohortTable,
+                                  strata) {
 
   #set connection
   suppressMessages(connection <- DatabaseConnector::connect(connectionDetails))
@@ -311,7 +314,6 @@ create_survival_table <- function(treatment_history,
 
   targetCohortId <- treatment_history$analysis_settings$targetCohortId
   minCellCount <- treatment_history$analysis_settings$minCellCount
-  strata <- treatment_history$analysis_settings$strata
 
   #extract target cohort for censoring
   targetCohort <- getTargetCohort(connectionDetails = connectionDetails,
@@ -326,17 +328,21 @@ create_survival_table <- function(treatment_history,
       dplyr::mutate(strata_total = 1L)
 
     strata_sym <- rlang::sym("strata_total")
+  } else {
+
+    targetCohort <- targetCohort %>%
+      dplyr::left_join(strata, by = c("subjectId"))
+
+    strata_sym <- strata %>%
+      dplyr::select(tidyr::starts_with("strata")) %>%
+      names() %>%
+      rlang::sym()
   }
 
-  strata_sym <- treatment_history$treatment_history %>%
-    dplyr::select(tidyr::starts_with("strata")) %>%
-    names() %>%
-    rlang::sym()
 
-  th <- arrow::read_feather(treatment_history$th_directory)
 
   #create survival table
-  survTab <- th %>%
+  survTab <- arrow::read_feather(treatment_history$th_directory) %>%
     dplyr::left_join(targetCohort, by = c("person_id" = "subjectId")) %>%
     dplyr::mutate(event = ifelse(event_end_date < cohortEndDate, 1, 0)) %>%
     dplyr::select(event_cohort_id, duration_era, event, !!strata_sym) %>%
@@ -360,14 +366,14 @@ create_survival_table <- function(treatment_history,
 
   survival_table <- structure(
     list(data = survTab$data,
-         survFit = survTab$survFit,
+         ##survFit = survTab$survFit,
          survInfo = survTab$survInfo,
          survSum = survTab$survSum,
          th_log = treatment_history$th_log,
          analysis_settings = treatment_history$analysis_settings),
     class = "ariadne_survival_analysis")
 
-  survival_table[1:4] <- purrr::map(survival_table[1:4], ~purrr::set_names(.x, survTab$event_cohort_id))
+  survival_table[1:3] <- purrr::map(survival_table[1:3], ~purrr::set_names(.x, survTab$event_cohort_id))
 
   return(survival_table)
 
