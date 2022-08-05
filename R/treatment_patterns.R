@@ -365,10 +365,10 @@ create_survival_table <- function(treatment_history,
 
 
   survival_table <- structure(
-    list(data = survTab$data,
-         ##survFit = survTab$survFit,
-         survInfo = survTab$survInfo,
-         survSum = survTab$survSum,
+    list(strata_name = rlang::as_string(strata_sym),
+         survival_data = survTab$data,
+         survival_info = survTab$survInfo,
+         survival_summary = survTab$survSum,
          th_log = treatment_history$th_log,
          analysis_settings = treatment_history$analysis_settings),
     class = "ariadne_survival_analysis")

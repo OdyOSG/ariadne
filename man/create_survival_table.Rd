@@ -8,7 +8,8 @@ create_survival_table(
   treatment_history,
   connectionDetails,
   resultsDatabaseSchema,
-  cohortTable
+  cohortTable,
+  strata
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ create_survival_table(
 \item{resultsDatabaseSchema}{the schema that hosts the users writeable results tables (or scratch)}
 
 \item{cohortTable}{the name where the cohorts are stored in the results schema}
+
+\item{strata}{a strata object to stratify the survival analysis}
 }
 \value{
 a SurvivalAnalysis object containing the data for the survival

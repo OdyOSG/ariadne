@@ -4,7 +4,7 @@
 \alias{build_survival_table}
 \title{Function to build survival table}
 \usage{
-build_survival_table(treatment_history)
+build_survival_table(treatment_history, strata)
 }
 \arguments{
 \item{treatment_history}{an ariadne_treatment_history object}

@@ -1,105 +1,50 @@
-#' Function to save the treatment history as csv
+#' Function to save the survival_analysis as an rds object
 #'
-#' @param treatment_history the dataframe output from create_treatment_history
-#' @param analysisSettings a DrugUtilizationAnalysisSettings object that defines the elements of the analysis
+#' @param survival_analysis a survival_analysis object with information about the treatment patterns
+#' @param output_folder an output location to save the files
 #' @import usethis
 #' @export
-save_treatment_history <- function(treatment_history,
-                                   analysisSettings) {
+save_survival_analysis <- function(survival_analysis,
+                                output_folder) {
 
-  treatmentPatternsFolder <- analysisSettings$outputFolder
-  database <- analysisSettings$database
-
-  #save treatment history to treatment patterns folder
-  if(!dir.exists(file.path(treatmentPatternsFolder, database))) {
-    dir.create(file.path(treatmentPatternsFolder, database), recursive = TRUE)
-  }
-  readr::write_csv(treatment_history,
-                   file = file.path(treatmentPatternsFolder, database,"treatmentHistory.csv"))
-  usethis::ui_info(
-    "data.frame of treatment history saved to: {ui_path(file.path(treatmentPatternsFolder, database, \"treatmentHistory.csv\"))}"
-  )
-}
-
-# TODO change the save settings to split the outcomes by analysis
-#' Function to save the survival analysis as multiple csv
-#'
-#' @param survival_table a SurvivalAnalysis object with information about the survival analysis
-#' @param analysisSettings a DrugUtilizationAnalysisSettings object that defines the elements of the analysis
-#' @include utils.R
-#' @import usethis
-#' @export
-save_survival_table <- function(survival_table,
-                                analysisSettings) {
-
-  #extract relevant tables
-  survTab <- survival_table$survTab
-  surv_summary <- survival_table$survFit
-  surv_curves <- survival_table$survInfo
-
-
-  treatmentPatternsFolder <- analysisSettings$outputFolder
-  database <- analysisSettings$database
-
+  analysis_settings <- survival_analysis$analysis_settings
+  strata_nm <- survival_analysis$strata_name
+  nm <- analysis_settings$targetCohortName
+  path <- file.path(output_folder, "survival_analysis")
+  filePath <- file.path(path, paste0("survival_analysis_", nm, strata_nm,".rds"))
   #save treatment patterns to treatment patterns folder
-  if(!dir.exists(file.path(treatmentPatternsFolder, database))) {
-    dir.create(file.path(treatmentPatternsFolder, database), recursive = TRUE)
+  if (!dir.exists(path)) {
+    dir.create(path, recursive = TRUE)
   }
-  #save survival data
-  readr::write_csv(survTab,
-                   file = file.path(treatmentPatternsFolder, database,"survivalData.csv"))
+  #save treatment_pathways
+  readr::write_rds(survival_analysis, file = filePath)
   usethis::ui_info(
-    "data.frame of survival data saved to: {ui_path(file.path(treatmentPatternsFolder, database, \"survivalData.csv\"))}"
-  )
-
-  #save surv_summary
-  readr::write_csv(surv_summary,
-                   file = file.path(treatmentPatternsFolder, database,"survivalSummary.csv"))
-  usethis::ui_info(
-    "data.frame of survival summary saved to: {ui_path(file.path(treatmentPatternsFolder, database, \"survivalSummary.csv\"))}"
-  )
-
-
-  #save surv_curves
-  readr::write_csv(surv_curves,
-                   file = file.path(treatmentPatternsFolder, database,"survivalCurves.csv"))
-  usethis::ui_info(
-    "data.frame of survival curves saved to: {ui_path(file.path(treatmentPatternsFolder, database, \"survivalCurves.csv\"))}"
+    "survival_analysis rds saved to: {ui_path(filePath)}"
   )
 
 }
 
-#' Function to save the treatment patterns as multiple csv
+#' Function to save the treatment patterns as an rds object
 #'
-#' @param pathway_analysis a PathwayAnalysis object with information about the treatment patterns
-#' @param analysisSettings a DrugUtilizationAnalysisSettings object that defines the elements of the analysis
+#' @param treatment_patterns a treatment_patterns object with information about the treatment patterns
+#' @param output_folder an output location to save the files
 #' @import usethis
 #' @export
 save_treatment_patterns <- function(treatment_patterns,
-                                    analysisSettings) {
+                                    output_folder) {
 
-  treatment_pathways <- treatment_patterns$treatmentPathways
-  pathway_attrition <- treatment_patterns$attrition
-
-  treatmentPatternsFolder <- analysisSettings$outputFolder
-  database <- analysisSettings$database
-
+  analysis_settings <- treatment_patterns$analysis_settings
+  nm <- analysis_settings$targetCohortName
+  path <- file.path(output_folder, "treatment_patterns")
+  filePath <- file.path(path, paste0("treatment_patterns_", nm,".rds"))
   #save treatment patterns to treatment patterns folder
-  if(!dir.exists(file.path(treatmentPatternsFolder, database))) {
-    dir.create(file.path(treatmentPatternsFolder, database), recursive = TRUE)
+  if (!dir.exists(path)) {
+    dir.create(path, recursive = TRUE)
   }
   #save treatment_pathways
-  readr::write_csv(treatment_pathways,
-                   file = file.path(treatmentPatternsFolder, database,"treatmentPathways.csv"))
+  readr::write_rds(treatment_patterns, file = filePath)
   usethis::ui_info(
-    "data.frame of treatment pathways saved to: {ui_path(file.path(treatmentPatternsFolder, database, \"treatmentPathways.csv\"))}"
-  )
-
-  #save pathway_attrition
-  readr::write_csv(pathway_attrition,
-                   file = file.path(treatmentPatternsFolder, database,"pathwayAttrition.csv"))
-  usethis::ui_info(
-    "data.frame of pathway attrition saved to: {ui_path(file.path(treatmentPatternsFolder, database, \"pathwayAttrition.csv\"))}"
+    "treatment_patterns rds saved to: {ui_path(filePath)}"
   )
 
 }
