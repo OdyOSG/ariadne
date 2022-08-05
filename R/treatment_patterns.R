@@ -297,17 +297,13 @@ build_survival_table <- function(treatment_history, strata) {
 #' @param strata a strata object to stratify the survival analysis
 #' @include utils.R helpers.R
 #' @return a SurvivalAnalysis object containing the data for the survival
-#' analysis, the survfit object and the surv_summary object from survminer
+#' analysis from survminer
 #' @export
 create_survival_table <- function(treatment_history,
                                   connectionDetails,
                                   resultsDatabaseSchema,
                                   cohortTable,
                                   strata) {
-
-  #set connection
-  suppressMessages(connection <- DatabaseConnector::connect(connectionDetails))
-  on.exit(DatabaseConnector::disconnect(connection))
 
   # resultsDatabaseSchema <- generatedTargetCohort$cohortTableRef$cohortDatabaseSchema
   # cohortTable <- generatedTargetCohort$cohortTableRef$cohortTableNames$cohortTable
@@ -360,20 +356,16 @@ create_survival_table <- function(treatment_history,
       survFit,
       data,
       ~survminer::surv_summary(.x, data = .y))) %>%
-    dplyr::mutate(survSum = purrr::map(survInfo, ~attr(.x, "table")))
+    dplyr::select(-.data$survFit)
 
 
 
   survival_table <- structure(
     list(strata_name = rlang::as_string(strata_sym),
-         survival_data = survTab$data,
-         survival_info = survTab$survInfo,
-         survival_summary = survTab$survSum,
+         survival_analysis = survTab,
          th_log = treatment_history$th_log,
          analysis_settings = treatment_history$analysis_settings),
     class = "ariadne_survival_analysis")
-
-  survival_table[1:3] <- purrr::map(survival_table[1:3], ~purrr::set_names(.x, survTab$event_cohort_id))
 
   return(survival_table)
 
