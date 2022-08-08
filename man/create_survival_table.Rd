@@ -25,7 +25,7 @@ create_survival_table(
 }
 \value{
 a SurvivalAnalysis object containing the data for the survival
-analysis, the survfit object and the surv_summary object from survminer
+analysis from survminer
 }
 \description{
 Function that creates survival tables from the treatment history

@@ -6,6 +6,7 @@
 \usage{
 get_age_strata(
   connectionDetails,
+  cdmDatabaseSchema,
   resultsDatabaseSchema,
   cohortTable,
   targetCohortId,
@@ -16,6 +17,8 @@ get_age_strata(
 }
 \arguments{
 \item{connectionDetails}{the connection Details object to connect to the database}
+
+\item{cdmDatabaseSchema}{the schema that holds the cdm}
 
 \item{resultsDatabaseSchema}{the results schema holding the cohort table}
 

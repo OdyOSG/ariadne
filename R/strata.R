@@ -104,6 +104,7 @@ define_age_strata <- function(name,
 
 #' Function that creates an age strata
 #' @param connectionDetails the connection Details object to connect to the database
+#' @param cdmDatabaseSchema the schema that holds the cdm
 #' @param resultsDatabaseSchema the results schema holding the cohort table
 #' @param cohortTable the cohort table holding the cohort
 #' @param targetCohortId the cohort Id used for the strata
@@ -115,6 +116,7 @@ define_age_strata <- function(name,
 #' @return a dataframe representing the strata for the cohort
 #' @export
 get_age_strata <- function(connectionDetails,
+                           cdmDatabaseSchema,
                            resultsDatabaseSchema,
                            cohortTable,
                            targetCohortId,
