@@ -153,7 +153,7 @@ get_age_strata <- function(connectionDetails,
                 personIds = personIds)
   #get strata data
   strata_df <- cohort %>%
-    left_join(dob, by = c("subjectId" = "personId")) %>%
+    dplyr::left_join(dob, by = c("subjectId" = "personId")) %>%
     dplyr::mutate(
       age = floor(lubridate::time_length(difftime(!!startDate, dob), "years"))
     ) %>%
