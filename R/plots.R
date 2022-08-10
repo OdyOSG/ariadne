@@ -67,11 +67,11 @@ plot_kaplan_meier <- function(survival_table,
                               treatmentRegimentId) {
 
 
-  fit <- survival_table$survInfo %>%
+  fit <- survTab$survival_analysis$survInfo %>%
     purrr::pluck(as.character(treatmentRegimentId))
 
 
-  dd <- survival_table$data %>%
+  dd <- survTab$survival_analysis$data %>%
     purrr::pluck(as.character(treatmentRegimentId))
 
 

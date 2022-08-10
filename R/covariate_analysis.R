@@ -31,11 +31,10 @@ define_covariates <- function(temporalStartDays,
 
 
   args <- rlang::fn_fmls(FeatureExtraction::getDbCovariateData)
-  args$connectionDetails <- rlang::sym("connectionDetails")
-  args$cdmDatabaseSchema <- rlang::sym("cdmDatabaseSchema")
-  args$cohortTable <- rlang::sym("cohortTable")
-  args$cohortDatabaseSchema <- rlang::sym("resultsDatabaseSchema")
-  args$cohortId <- rlang::sym("targetCohortId")
+  args$connectionDetails <- connectionDetails
+  args$cdmDatabaseSchema <- cdmDatabaseSchema
+  args$cohortTable <- cohortTable
+  args$cohortId <- targetCohortId
   args$covariateSettings <- covariateSettings
 
   call <- rlang::call2("%>%",
