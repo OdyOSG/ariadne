@@ -9,7 +9,8 @@
 #' @return a ariadne covariates object that defines the covariates to extract
 #' @export
 define_covariates <- function(temporalStartDays,
-                              temporalEndDays) {
+                              temporalEndDays,
+                              targetCohortId) {
 
 
 
@@ -33,6 +34,7 @@ define_covariates <- function(temporalStartDays,
   args <- rlang::fn_fmls(FeatureExtraction::getDbCovariateData)
   args$connectionDetails <- connectionDetails
   args$cdmDatabaseSchema <- cdmDatabaseSchema
+  args$cohortDatabaseSchema <- resultsDatabaseSchema
   args$cohortTable <- cohortTable
   args$cohortId <- targetCohortId
   args$covariateSettings <- covariateSettings
@@ -84,12 +86,9 @@ convert_covariates_arrow <- function(covDat) {
 #' Function that builds covariates
 #'
 #' @param covariates an ariadne_covariates class object
-#' @param cohortId an integer that defines which cohort to build covariates
 #' @return an ariadne_covariates object
 #' @export
-build_covariates <- function(covariates,
-                             cohortId) {
-  covariates$call[[2]]$cohortId <- as.integer(cohortId)
+build_covariates <- function(covariates) {
   eval(covariates$call)
 }
 
@@ -144,7 +143,7 @@ aggregate_ariadne <- function(ariadne,
     dplyr::ungroup() %>%
     dplyr::mutate(conceptId = covariateId_to_conceptId(covariateId)) %>%
     dplyr::left_join(strata_count, by = c(rlang::as_string(strata_sym))) %>%
-    dplyr::mutate(pct = nn / tot)
+    dplyr::mutate(pct = round((nn / tot), digits = 3))
 
   #Step 3: Join on rollups------------------
 
@@ -186,20 +185,28 @@ aggregate_ariadne <- function(ariadne,
       .keep = "unused"
     ) %>%
     formatDemographics() %>%
+    dplyr::mutate(
+      time_id = timeId,
+      analysis_id = analysisId
+    ) %>%
     dplyr::select(.data$conceptName, .data$conceptId, .data$categoryName,
-                  .data$categoryId, .data$timeId, .data$analysisId,
+                  .data$categoryId, .data$time_id, .data$timeId,
+                  .data$analysisId, .data$analysis_id,
                   !!strata_sym, .data$nn, .data$pct)
 
-  dir.create(file.path(outputFolder, rlang::as_string(strata_sym)))
+  arrow_path <- file.path(outputFolder, rlang::as_string(strata_sym))
 
-  arrow::write_dataset(dataset = dat,
-                       path = file.path(outputFolder, rlang::as_string(strata_sym)),
-                       format = "csv",
-                       partitioning = c("analysisId", "timeId"))
+  if (!dir.exists(arrow_path)) {
+    dir.create(arrow_path)
+  }
+
+  arrow::write_dataset(dataset = dat %>% group_by(.data$analysis_id, .data$time_id),
+                       path = arrow_path,
+                       format = "csv")
 
 
   arrow_meta <- structure(list(
-    dbDirectory = file.path(outputFolder, rlang::as_string(strata_sym)),
+    dbDirectory = arrow_path,
     dbFormat = "csv",
     analysisRef = ariadne$analysisRef,
     timeRef = ariadne$timeRef,

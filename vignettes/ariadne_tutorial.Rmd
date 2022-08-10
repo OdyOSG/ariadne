@@ -1,0 +1,58 @@
+---
+title: "Ariadne Tutorial"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Ariadne Tutorial}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Ariadne Introduction
+
+Ariadne is a proposed R package for conduct a drug utilization study using the OMOP common data model. This package has 3 main outputs:
+
+1)  Post-index drug utilization: A summary of drug usage for a population of interest at points following cohort entry. The purpose of this is to assess the rate at which persons take drugs following a diagnosis. The post-index period must be defined in days relative to the cohort entry date. This step utilizes the ohdsi package FeatureExtraction which extracts patient covariates based on specified period of time. We then use two rollups to better categorize the covariates: ICD chapters for conditions and ATC 2nd class for drugs. Once we have aggregated the covariates we can create 3 general visualizations: a table, a manhattan plot and a cleveland plot. This demonstration only creates the rectangular data object to build these visualizations. Code is not yet developed for the visualizations.
+
+2)  Treatment Patterns: the sequence and patterns at which drugs are prescribed is another section of interest for drug utilization. The kinds of pathways and regiments give us information on the prescribing landscape for the population of interest. The basis of the treatment patterns analysis utilizes code from [TreatmentPatterns](https://github.com/mi-erasmusmc/TreatmentPatterns). We utilize the analytical specification for treatment patterns defined in this R package. The R package has been reconfigured to better fit our proposed omop study framework. The output of the treatment patterns analysis is a sankey diagram. A sankey is used because it does a good job depicting flows from on set of values to another.
+
+3)  Basic Survival Analysis: the last piece in the drug utilization is understanding the time to discontinuation. The key question is how long does the patient persist on a particular ingredient (or combination of ingredients) for their condition. This type of information conveys whether people stay on a particular drug for long periods of time or if they are more likely to switch for any reason. For this analysis we take the data formatting from the `TreatmentPatterns` package, but instead of aggregating on the sequence, we focus on summarizing the duration on the ingredient. After isolating the duration and accounting for right censoring, we use the `survival` and `survminer` packages to produce the survival table and kaplan meier plots.
+
+While we can produce strong evidence from the entire study population using these three outputs, many times researchers are interested in stratifications. We want to be able to look at the behavior of a gender sub-population (males v females) or perhaps sub-populations based on age. There are a variety of stratifications that we can create based on values, concepts and cohorts. Ariadne begins to introduce the idea of how stratifications are built for omop studies.
+
+In the following vignette, we provide an example of how to create a drug utilization study using this available functionality from ariadne. The code-flow to this package is currently under review and may receive changes. This vignette only works for this version of ariadne.
+
+## Setup
+
+As done in most omop studies our first step is to specify the connection to dbms that hosts the omop cdm and provide direction on the schemas used to extract and write information for our analysis.
+
+```{r setup}
+library(ariadne)
+library(FeatureExtraction)
+library(DatabaseConnector)
+library(tidyverse, warn.conflicts = FALSE)
+library(data.table)
+options(dplyr.summarise.inform = FALSE)
+
+connectionDetails <- DatabaseConnector::createConnectionDetails(
+  dbms = "postgresql",
+  server = keyring::key_get("cdm_server"),
+  user = keyring::key_get("cdm_user"),
+  password = keyring::key_get("cdm_password"),
+  port = "5441"
+)
+
+#set parameters
+vocabularyDatabaseSchema <- keyring::key_get("cdmDatabaseSchema")
+cdmDatabaseSchema <- keyring::key_get("cdmDatabaseSchema")
+resultsDatabaseSchema <- keyring::key_get("resultsDatabaseSchema")
+cohortTable <- "boo" #boo of ohdsi results
+```
+
+Before this analysis I created all the cohorts from the book of ohdsi, you can use this

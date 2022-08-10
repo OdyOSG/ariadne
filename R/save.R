@@ -48,3 +48,32 @@ save_treatment_patterns <- function(treatment_patterns,
   )
 
 }
+
+#' Function to load aggregated ariadne covariate object from file
+#'
+#' @param ariadne an aggregated ariadne covariate object with arrow files of information
+#' @export
+load_ariadne <- function(ariadne) {
+
+  strata_sym <- rlang::sym(ariadne$strata)
+
+  ariadne_schema <- arrow::schema(
+    conceptName = arrow::string(),
+    conceptId = arrow::int64(),
+    categoryName = arrow::string(),
+    categoryId = arrow::int64(),
+    timeId = arrow::int16(),
+    analysisId = arrow::int16(),
+    strata = arrow::int16(),
+    nn = arrow::int64(),
+    pct = arrow::float64()
+  )
+
+  gg <- arrow::open_dataset(ariadne$dbDirectory,
+                      format = ariadne$dbFormat,
+                      partitioning = c("analysis_id", "time_id"),
+                      schema = ariadne_schema,
+                      skip = 1) %>%
+    rename(!!strata_sym := strata)
+  return(gg)
+}

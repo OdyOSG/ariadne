@@ -4,7 +4,7 @@
 \alias{define_covariates}
 \title{A function that defines the covariates for ariadne}
 \usage{
-define_covariates(temporalStartDays, temporalEndDays)
+define_covariates(temporalStartDays, temporalEndDays, targetCohortId)
 }
 \arguments{
 \item{temporalStartDays}{an integer vector of days relative to index depicting the start window.

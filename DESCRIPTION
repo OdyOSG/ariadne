@@ -28,3 +28,7 @@ Collate:
     'save.R'
     'strata.R'
     'treatment_patterns.R'
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

@@ -4,12 +4,10 @@
 \alias{build_covariates}
 \title{Function that builds covariates}
 \usage{
-build_covariates(covariates, cohortId)
+build_covariates(covariates)
 }
 \arguments{
 \item{covariates}{an ariadne_covariates class object}
-
-\item{cohortId}{an integer that defines which cohort to build covariates}
 }
 \value{
 an ariadne_covariates object
