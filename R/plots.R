@@ -89,3 +89,113 @@ plot_kaplan_meier <- function(survival_table,
 
 
 }
+
+#' Function to plot the covariates distribution using manhattan plot
+#'
+#' @param timeId window id to plot
+#' @param analysisId analisis id to plot
+#' @param strata_name strata to plot, if NULL will be plotted without strata
+#' @param output_folder folder where stored aggregated covariates
+#' @return a manhattan plot
+#' @include utils.R
+#' @export
+manhattan_covariates <- function(
+  timeId,
+  analysisId,
+  strata_name = NULL,
+  output_folder
+) {
+  analysisId = paste0('analysis_id=', analysisId)
+  timeId = paste0('time_id=', timeId)
+
+  pathToCsv <- paste(
+    gsub('/', '\\\\',output_folder),
+    ifelse(is.null(strata_name), 'strata_total', paste0('strata_', strata_name)),
+    analysisId,
+    timeId,
+    'part-0.csv',
+    sep = '\\'
+  )
+  ggplot2::ggplot(data = read.csv(pathToCsv),
+                  ggplot2::aes(x = conceptName, y = pct,
+                               color = categoryName)) +
+    ggplot2::labs( title = '_____',  color= "") +
+    ggplot2::geom_rect(min = 0, ymax = 1, xmin=-Inf, xmax=Inf, color = "gray90", fill = "gray90") +
+    ggplot2::theme(axis.title.x = ggplot2::element_text(color = "black",
+                                                        size = 14, angle = 0,
+                                                        hjust = .5, vjust = 0, face = "bold",
+    ),
+    axis.title.y = ggplot2::element_text(
+      color = "black",
+      size = 14, angle = 90,
+      hjust = .5, vjust = .5,
+      face = "bold"))+
+    ggplot2::geom_hline(ggplot2::aes(
+      yintercept = 0), color = "black", alpha=1) +
+    ggplot2::geom_point(alpha = 0.75,
+                        position = ggplot2::position_dodge(0.2)) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(hjust = 0.25),
+      legend.position = "bottom",
+      legend.key.size = ggplot2::unit(0.25, "cm"),
+      legend.text = ggplot2::element_text(size=8),
+      panel.border = ggplot2::element_blank(),
+      panel.grid.major.x = ggplot2::element_blank(),
+      panel.grid.minor.x = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank()
+    )  +  ggplot2::geom_abline(intercept = 150, slope = 20,
+                               color = "gray",
+                               size = 0.5,
+                               alpha = 0.8) +
+    ggplot2::xlab("Covariates") + ggplot2::ylab("Frequency(%)") +
+    ggplot2::labs(title = "")
+}
+
+
+#' Function to plot the covariates distribution using cleveland plot
+#'
+#' @param timeId window id to plot
+#' @param analysisId analisis id to plot
+#' @param strata_name strata to plot, if NULL will be plotted without strata
+#' @param output_folder folder where stored aggregated covariates
+#' @return a cleveland plot
+#' @include utils.R
+#' @export
+cleveland_covariates <- function(
+  timeId,
+  analysisId,
+  strata_name,
+  output_folder
+) {
+  analysisId = paste0('analysis_id=', analysisId)
+  timeId = paste0('time_id=', timeId)
+
+  pathToCsv <- paste(
+    gsub('/', '\\\\',output_folder),
+    ifelse(is.null(strata_name), 'strata_total', paste0('strata_', strata_name)),
+    analysisId,
+    timeId,
+    'part-0.csv',
+    sep = '\\'
+  )
+  ggplot2::ggplot(data = read.csv(pathToCsv),
+                  ggplot2::aes(x    = pct,
+                               xend = max(pct),
+                               y    = reorder(categoryName, pct),
+                               yend = reorder(categoryName, pct)
+                  ),
+                  show.legend = F) +
+
+    ggplot2::geom_point(ggplot2::aes(
+      x = pct,
+      y = categoryName,
+      colour = categoryName
+    ),
+    show.legend = F,
+    position = ggplot2::position_jitter(w = 0.01, h = 0.2)
+    ) +
+    ggplot2::labs(title = 'Distribution of covariates',
+                  x = "Frequency (%)", y = NULL) +
+    ggplot2::theme_bw()
+}
