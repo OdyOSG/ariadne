@@ -1,13 +1,16 @@
 #' Function to plot the sankey for treatment patterns
 #'
 #' @param pathway_analysis a PathwayAnalysis object with information about the treatment patterns
-#' @return a sankey diagram using networkD3::sankeyNetwork. We implement the lancet color schema from ggsci
+#' @param min_count select a minimum count to include in the diagram
+#' @return a sankey diagram using networkD3::sankeyNetwork. We implement a color blind friendly palette
 #' @export
-plot_treatment_patterns <- function(pathway_analysis, type = "sankey") {
+plot_treatment_patterns <- function(pathway_analysis,
+                                    min_count = 30) {
 
 
-  treatment_pathways <- pathway_analysis$treatmentPathways %>%
-    dplyr::slice_max(n, n = 18)
+   treatment_pathways <- pathway_analysis$treatmentPathways %>%
+     dplyr::filter(n >= min_count) %>%
+     dplyr::mutate(dplyr::across(dplyr::contains("cohort"), ~gsub("_era", "", .)))
 
   #set up data for sankey
   links <- treatment_pathways %>%
@@ -21,7 +24,8 @@ plot_treatment_patterns <- function(pathway_analysis, type = "sankey") {
     dplyr::mutate(target = dplyr::lead(source, order_by = column)) %>%
     tidyr::drop_na(target, source) %>%
     dplyr::group_by(source, target) %>%
-    dplyr::summarise(value = sum(n), .groups = 'drop')
+    dplyr::summarise(value = sum(n), .groups = 'drop') %>%
+    dplyr::arrange(desc(value))
 
   nodes <- data.frame(name = unique(c(links$source, links$target)))
   nodes <- data.table::data.table(nodes)
@@ -32,17 +36,16 @@ plot_treatment_patterns <- function(pathway_analysis, type = "sankey") {
   links$type <- sub(' .*', '',
                     as.data.frame(nodes)[links$source + 1, 'name'])
   data.table::setkey(links, type)
-
+  data.table::setorder(links, cols = - "value")
   #create custom colors
   label <- unique(links$type)
   label2 <- paste0("'", paste(label, collapse = "','"), "',", "'end'")
 
 
-  allCols <- c(ggsci::pal_lancet("lanonc")(8),
-               ggsci::pal_lancet("lanonc", alpha = 0.45)(9))
+  martin_colors <- unname(colorBlindness::paletteMartin)[-1]
 
 
-  col <- allCols[seq_along(label)]
+  col <- martin_colors[seq_along(label)]
   col2 <- paste0("'", paste(col, collapse = "','"), "',", "'#1B1919FF'")
 
 
@@ -52,7 +55,7 @@ plot_treatment_patterns <- function(pathway_analysis, type = "sankey") {
 
   #plot sankeyNetwork
   networkD3::sankeyNetwork(Links=links, Nodes=nodes, Source='source', Target='target',
-                           Value='value', NodeID='name', fontSize=10, colourScale = myCol)
+                           Value='value', NodeID='name', fontSize = 11, colourScale = myCol)
 }
 
 #' Function to plot the survival analysis for time to discontinuation

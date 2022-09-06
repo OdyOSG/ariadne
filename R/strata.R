@@ -124,41 +124,32 @@ get_age_strata <- function(connectionDetails,
                            op,
                            value) {
 
-  #get target cohort
-  cohort <- getTargetCohort(connectionDetails = connectionDetails,
-                            resultsDatabaseSchema = resultsDatabaseSchema,
-                            cohortTable = cohortTable,
-                            targetCohortId = targetCohortId)
-
   #check operator
   kk <- checkOp(op)
 
   #create symbols for dplyr
   strata_name_full <- paste("strata", name, sep ="_")
   strata_name_sym <- rlang::sym(strata_name_full)
-  startDate <- grep("start", names(cohort), value = TRUE, ignore.case = TRUE) %>%
-    rlang::sym()
-  rowId <- grep("subject", names(cohort), value = TRUE, ignore.case = TRUE) %>%
-    rlang::sym()
 
   #define logic test
-  logicTest <- rlang::call2(kk$op, rlang::sym("age"), value)
+  logicTest <- rlang::call2(kk$op, rlang::sym("covariateValue"), value)
+
+  getCovars <- purrr::quietly(getDbCovariateData)
 
 
-  #get dob
-  personIds <- getUniquePersons(cohort)
+  #get age
+  covDat <- getCovars(connectionDetails = connectionDetails,
+                      cdmDatabaseSchema = cdmDatabaseSchema,
+                      cohortDatabaseSchema = resultsDatabaseSchema,
+                      cohortTable = cohortTable,
+                      cohortId = targetCohortId,
+                      covariateSettings = FeatureExtraction::createCovariateSettings(useDemographicsAge = TRUE))
 
-  dob <- getDob(connectionDetails = connectionDetails,
-                cdmDatabaseSchema = cdmDatabaseSchema,
-                personIds = personIds)
-  #get strata data
-  strata_df <- cohort %>%
-    dplyr::left_join(dob, by = c("subjectId" = "personId")) %>%
-    dplyr::mutate(
-      age = floor(lubridate::time_length(difftime(!!startDate, dob), "years"))
-    ) %>%
-    dplyr::mutate(!! strata_name_sym := dplyr::if_else(eval(logicTest), 1L, 0L, 0L)) %>%
-    dplyr::select(!!rowId, !!strata_name_sym)
+  sqlite <- RSQLite::SQLite()
+  con <- dbConnect(sqlite, covDat$result@dbname)
+  strata_df <- DBI::dbGetQuery(con, "SELECT * FROM covariates") %>%
+    dplyr::mutate(!! strata_name_sym := ifelse(eval(logicTest), 1L, 0L)) %>%
+    dplyr::select(.data$rowId, !!strata_name_sym)
 
   return(strata_df)
 }

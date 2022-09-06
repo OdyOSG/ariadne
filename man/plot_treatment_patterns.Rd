@@ -4,13 +4,15 @@
 \alias{plot_treatment_patterns}
 \title{Function to plot the sankey for treatment patterns}
 \usage{
-plot_treatment_patterns(pathway_analysis, type = "sankey")
+plot_treatment_patterns(pathway_analysis, min_count = 30)
 }
 \arguments{
 \item{pathway_analysis}{a PathwayAnalysis object with information about the treatment patterns}
+
+\item{min_count}{select a minimum count to include in the diagram}
 }
 \value{
-a sankey diagram using networkD3::sankeyNetwork. We implement the lancet color schema from ggsci
+a sankey diagram using networkD3::sankeyNetwork. We implement a color blind friendly palette
 }
 \description{
 Function to plot the sankey for treatment patterns
