@@ -1,6 +1,6 @@
 Package: ariadne
 Title: OHDSI Characterization Study Aid
-Version: 0.0.0.9000
+Version: 0.0.1
 Authors@R: 
     person("Martin", "Lavallee", , "martin.lavallee@odysseusinc.com", role = c("aut", "cre"))
 Description: This package helps aid in the design and execution of ohdsi characterization studies.
