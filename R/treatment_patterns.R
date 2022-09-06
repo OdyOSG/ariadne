@@ -431,7 +431,7 @@ doCreateTreatmentHistory <- function(current_cohorts, targetCohortId, eventCohor
   current_cohorts[,duration_era:=difftime(event_end_date, event_start_date, units = "days")]
 
   current_cohorts <- current_cohorts[order(event_start_date, event_end_date),]
-  current_cohorts[,lag_variable:=shift(event_end_date, type = "lag"), by=c("person_id", "event_cohort_id")]
+  current_cohorts[,lag_variable:=data.table::shift(event_end_date, type = "lag"), by=c("person_id", "event_cohort_id")]
   current_cohorts[,gap_same:=difftime(event_start_date, lag_variable, units = "days"),]
   current_cohorts$lag_variable <- NULL
 
@@ -461,13 +461,13 @@ doCombinationWindow <- function(treatment_history, combinationWindow, minPostCom
   while(sum(treatment_history$SELECTED_ROWS)!=0) {
 
     # Which have gap previous shorter than combination window OR min(current duration era, previous duration era) -> add column switch
-    treatment_history[SELECTED_ROWS == 1 & (-GAP_PREVIOUS < combinationWindow  & !(-GAP_PREVIOUS == duration_era | -GAP_PREVIOUS == shift(duration_era, type = "lag"))), switch:=1]
+    treatment_history[SELECTED_ROWS == 1 & (-GAP_PREVIOUS < combinationWindow  & !(-GAP_PREVIOUS == duration_era | -GAP_PREVIOUS == data.table::shift(duration_era, type = "lag"))), switch:=1]
 
     # For rows selected not in column switch -> if treatment_history[r - 1, event_end_date] <= treatment_history[r, event_end_date] -> add column combination first received, first stopped
-    treatment_history[SELECTED_ROWS == 1 & is.na(switch) & shift(event_end_date, type = "lag") <= event_end_date, combination_FRFS:=1]
+    treatment_history[SELECTED_ROWS == 1 & is.na(switch) & data.table::shift(event_end_date, type = "lag") <= event_end_date, combination_FRFS:=1]
 
     # For rows selected not in column switch -> if treatment_history[r - 1, event_end_date] > treatment_history[r, event_end_date] -> add column combination last received, first stopped
-    treatment_history[SELECTED_ROWS == 1 & is.na(switch) & shift(event_end_date, type = "lag") > event_end_date, combination_LRFS:=1]
+    treatment_history[SELECTED_ROWS == 1 & is.na(switch) & data.table::shift(event_end_date, type = "lag") > event_end_date, combination_LRFS:=1]
 
     ParallelLogger::logInfo(paste0("Iteration ", iterations, " modifying  ", sum(treatment_history$SELECTED_ROWS), " selected rows out of ", nrow(treatment_history), ": ", sum(!is.na(treatment_history$switch)) , " switches, ", sum(!is.na(treatment_history$combination_FRFS)), " combinations FRFS and ", sum(!is.na(treatment_history$combination_LRFS)), " combinations LRFS"))
     if (sum(!is.na(treatment_history$switch)) + sum(!is.na(treatment_history$combination_FRFS)) +  sum(!is.na(treatment_history$combination_LRFS)) != sum(treatment_history$SELECTED_ROWS)) {
@@ -476,14 +476,14 @@ doCombinationWindow <- function(treatment_history, combinationWindow, minPostCom
 
     # Do transformations for each of the three newly added columns
     # Construct helpers
-    treatment_history[,event_start_date_next:=shift(event_start_date, type = "lead"),by=person_id]
-    treatment_history[,event_end_date_previous:=shift(event_end_date, type = "lag"),by=person_id]
-    treatment_history[,event_end_date_next:=shift(event_end_date, type = "lead"),by=person_id]
-    treatment_history[,event_cohort_id_previous:=shift(event_cohort_id, type = "lag"),by=person_id]
+    treatment_history[,event_start_date_next:=data.table::shift(event_start_date, type = "lead"),by=person_id]
+    treatment_history[,event_end_date_previous:=data.table::shift(event_end_date, type = "lag"),by=person_id]
+    treatment_history[,event_end_date_next:=data.table::shift(event_end_date, type = "lead"),by=person_id]
+    treatment_history[,event_cohort_id_previous:=data.table::shift(event_cohort_id, type = "lag"),by=person_id]
 
     # Case: switch
     # Change end treatment_history of previous row -> no minPostCombinationDuration
-    treatment_history[shift(switch, type = "lead")==1,event_end_date:=event_start_date_next]
+    treatment_history[data.table::shift(switch, type = "lead")==1,event_end_date:=event_start_date_next]
 
     # Case: combination_FRFS
     # Add a new row with start date (r) and end date (r-1) as combination (copy current row + change end date + update concept id) -> no minPostCombinationDuration
@@ -492,7 +492,7 @@ doCombinationWindow <- function(treatment_history, combinationWindow, minPostCom
     add_rows_FRFS[,event_cohort_id:=paste0(event_cohort_id, "+", event_cohort_id_previous)]
 
     # Change end date of previous row -> check minPostCombinationDuration
-    treatment_history[shift(combination_FRFS, type = "lead")==1,c("event_end_date","check_duration"):=list(event_start_date_next, 1)]
+    treatment_history[data.table::shift(combination_FRFS, type = "lead")==1,c("event_end_date","check_duration"):=list(event_start_date_next, 1)]
 
     # Change start date of current row -> check minPostCombinationDuration
     treatment_history[combination_FRFS==1,c("event_start_date", "check_duration"):=list(event_end_date_previous,1)]
@@ -502,11 +502,11 @@ doCombinationWindow <- function(treatment_history, combinationWindow, minPostCom
     treatment_history[combination_LRFS==1,event_cohort_id:=paste0(event_cohort_id, "+", event_cohort_id_previous)]
 
     # Add a new row with end date (r) and end date (r-1) to split drug era (copy previous row + change end date) -> check minPostCombinationDuration
-    add_rows_LRFS <- treatment_history[shift(combination_LRFS, type = "lead")==1,]
+    add_rows_LRFS <- treatment_history[data.table::shift(combination_LRFS, type = "lead")==1,]
     add_rows_LRFS[,c("event_start_date", "check_duration"):=list(event_end_date_next,1)]
 
     # Change end date of previous row -> check minPostCombinationDuration
-    treatment_history[shift(combination_LRFS, type = "lead")==1,c("event_end_date", "check_duration"):=list(event_start_date_next,1)]
+    treatment_history[data.table::shift(combination_LRFS, type = "lead")==1,c("event_end_date", "check_duration"):=list(event_start_date_next,1)]
 
     # Combine all rows and remove helper columns
     treatment_history <- rbind(treatment_history, add_rows_FRFS, fill=TRUE)
@@ -543,7 +543,7 @@ selectRowsCombinationWindow <- function(treatment_history) {
   treatment_history <- treatment_history[order(person_id, event_start_date, event_end_date),]
 
   # Calculate gap with previous treatment
-  treatment_history[,GAP_PREVIOUS:=difftime(event_start_date, shift(event_end_date, type = "lag"), units = "days"), by = person_id]
+  treatment_history[,GAP_PREVIOUS:=difftime(event_start_date, data.table::shift(event_end_date, type = "lag"), units = "days"), by = person_id]
   treatment_history$GAP_PREVIOUS <- as.integer(treatment_history$GAP_PREVIOUS)
 
   # Find all rows with gap_previous < 0
@@ -609,7 +609,7 @@ doFilterTreatments <- function(treatment_history, filterTreatments) {
 
     } else if (filterTreatments == "Changes") {
       # Group all rows per person for which previous treatment is same
-      tryCatch(treatment_history <- treatment_history[, group:=rleid(person_id,event_cohort_id)],
+      tryCatch(treatment_history <- treatment_history[, group:=data.table::rleid(person_id,event_cohort_id)],
                error = function(e){print(paste0("Check if treatment_history contains sufficient records: ", e))})
 
       # Remove all rows with same sequential treatments
