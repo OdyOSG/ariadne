@@ -165,7 +165,7 @@ manhattan_covariates <- function(
 cleveland_covariates <- function(
   timeId,
   analysisId,
-  strata_name,
+  strata_name = NULL,
   output_folder
 ) {
   analysisId = paste0('analysis_id=', analysisId)
