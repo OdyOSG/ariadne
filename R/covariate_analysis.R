@@ -149,7 +149,7 @@ aggregate_ariadne <- function(ariadne,
 
   #find condition rollup
   condition_concepts <- dat %>%
-    dplyr::filter(.data$analysisId == 203) %>%
+    dplyr::filter(.data$analysisId == 203 | .data$analysisId == 210) %>%
     dplyr::distinct(.data$conceptId) %>%
     dplyr::pull() %>%
     rollupConditions(
@@ -160,7 +160,7 @@ aggregate_ariadne <- function(ariadne,
 
   #find drug rollup
   drug_concepts <- dat %>%
-    dplyr::filter(.data$analysisId == 403) %>%
+    dplyr::filter(.data$analysisId == 403 | .data$analysisId == 410) %>%
     dplyr::distinct(.data$conceptId) %>%
     dplyr::pull() %>%
     rollupDrugs(
