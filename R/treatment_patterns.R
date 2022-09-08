@@ -190,14 +190,14 @@ treatment_history <- function(connectionDetails,
   #                    by = c("person_id" = "subjectId"))
   # }
 
-#
-#   th_Meta <- structure(list(
-#     th_directory = tempfile(),
-#     th_log = log,
-#     analysis_settings = analysisSettings
-#   ), class = "ariadne_treatment_history")
-#
-#   arrow::write_feather(th, th_Meta$th_directory)
+
+  th_Meta <- structure(list(
+    th_directory = tempfile(),
+    th_log = log,
+    analysis_settings = analysisSettings
+  ), class = "ariadne_treatment_history")
+
+  arrow::write_feather(th, th_Meta$th_directory)
 
   return(th)
 }
