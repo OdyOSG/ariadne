@@ -199,7 +199,7 @@ treatment_history <- function(connectionDetails,
 
   arrow::write_feather(th, th_Meta$th_directory)
 
-  return(th)
+  return(th_Meta)
 }
 
 #' Function to build treatment patterns
