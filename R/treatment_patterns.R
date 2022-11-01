@@ -161,7 +161,7 @@ treatment_history <- function(connectionDetails,
                  minPostCombinationDuration = analysisSettings$minPostCombinationDuration,
                  filterTreatments = analysisSettings$filterTreatments)
 
-  log <- str_split(th$output, "\n")[[1]]
+  log <- stringr::str_split(th$output, "\n")[[1]]
   th <- th$result
 
   # Add event_seq number to determine order of treatments in pathway
